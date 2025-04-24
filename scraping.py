@@ -25,9 +25,11 @@ class Article:
     """Data class for article information"""
     title: str
     source: str
+    source_id: Optional[str]
     author: Optional[str]
     description: Optional[str]
     url: str
+    url_to_image: Optional[str]
     published_at: str
     content: Optional[str]
 
@@ -37,9 +39,11 @@ class Article:
         return cls(
             title=data.get('title', ''),
             source=data.get('source', {}).get('name', ''),
+            source_id=data.get('source', {}).get('id'),
             author=data.get('author'),
             description=data.get('description'),
             url=data.get('url', ''),
+            url_to_image=data.get('urlToImage'),
             published_at=data.get('publishedAt', ''),
             content=data.get('content')
         )
@@ -137,17 +141,19 @@ class NewsDataExporter:
         with open(file_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
             # Write header
-            writer.writerow(['title', 'source', 'author', 'description', 
-                            'url', 'publishedAt', 'content'])
+            writer.writerow(['title', 'source', 'source_id', 'author', 'description', 
+                            'url', 'url_to_image', 'publishedAt', 'content'])
             
             # Write data
             for article in articles:
                 writer.writerow([
                     article.title,
                     article.source,
+                    article.source_id or '',
                     article.author or '',
                     article.description or '',
                     article.url,
+                    article.url_to_image or '',
                     article.published_at,
                     article.content or ''
                 ])
@@ -161,7 +167,7 @@ def display_results(articles: List[Article]):
     table = Table(title="📰 Latest News Results")
     
     table.add_column("#", style="cyan")
-    table.add_column("Title", style="green")
+    table.add_column("Title", style="green", no_wrap=False)
     table.add_column("Source", style="yellow")
     table.add_column("Published", style="magenta")
     
@@ -179,10 +185,22 @@ def display_results(articles: List[Article]):
     
     console.print(table)
     
-    # Print URLs separately for better readability/accessibility
-    console.print("\n[bold]Article URLs:[/bold]")
+    # Print more detailed information
+    console.print("\n[bold]Article Details:[/bold]")
     for i, article in enumerate(articles, start=1):
-        console.print(f"{i}. [link={article.url}]{article.url}[/link]")
+        console.print(f"\n[cyan]{i}. [bold]{article.title}[/bold][/cyan]")
+        console.print(f"   [yellow]Source:[/yellow] {article.source}")
+        if article.author:
+            console.print(f"   [yellow]Author:[/yellow] {article.author}")
+        if article.description:
+            console.print(f"   [yellow]Description:[/yellow] {article.description}")
+        console.print(f"   [yellow]Published:[/yellow] {article.published_at}")
+        console.print(f"   [yellow]URL:[/yellow] [link={article.url}]{article.url}[/link]")
+        if article.url_to_image:
+            console.print(f"   [yellow]Image:[/yellow] [link={article.url_to_image}]{article.url_to_image}[/link]")
+        if article.content:
+            content_preview = article.content.split('[+')[0] if '[+' in article.content else article.content
+            console.print(f"   [yellow]Content Preview:[/yellow] {content_preview}")
 
 
 def main():
@@ -208,6 +226,8 @@ def main():
                         help="Suppress console display output")
     parser.add_argument("--debug", "-d", action="store_true",
                         help="Enable debug logging")
+    parser.add_argument("--full-content", "-f", action="store_true",
+                        help="Display full article content in console output")
     
     args = parser.parse_args()
     
@@ -231,6 +251,13 @@ def main():
         raw_data = news_client.fetch_everything(
             args.keyword, args.language, args.count
         )
+        
+        # Process API response metadata
+        status = raw_data.get("status")
+        total_results = raw_data.get("totalResults", 0)
+        logger.info(f"API Status: {status}, Total Results: {total_results}")
+        
+        # Convert to Article objects
         articles = [Article.from_dict(a) for a in raw_data.get("articles", [])]
         
         # Save data
@@ -241,6 +268,17 @@ def main():
         # Display results
         if not args.quiet:
             display_results(articles)
+            if args.full_content:
+                console = Console()
+                console.print("\n[bold]Full Article Content:[/bold]")
+                for i, article in enumerate(articles, start=1):
+                    console.print(f"\n[cyan]{i}. {article.title}[/cyan]")
+                    if article.content:
+                        console.print(f"[yellow]Content:[/yellow] {article.content}")
+                    else:
+                        console.print("[yellow]No content available[/yellow]")
+                    console.print("---")
+            
             logger.info(f"✅ Data saved to:")
             logger.info(f"   JSON: {json_file}")
             logger.info(f"   CSV: {csv_file}")
