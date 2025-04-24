@@ -1,0 +1,40 @@
+newsgenie-nlp-pipeline/
+│
+├── 📁 data/                  # Raw and processed data
+│   ├── raw/                 # Uncleaned scraped or downloaded articles
+│   ├── processed/           # Cleaned, tokenized, lemmatized versions
+│   └── external/            # Any external datasets like AG News
+│
+├── 📁 notebooks/             # Jupyter notebooks for exploration
+│   ├── 01_preprocessing.ipynb
+│   ├── 02_classification.ipynb
+│   ├── 03_embeddings.ipynb
+│   └── 04_transformers_and_generation.ipynb
+│
+├── 📁 newsgenie/             # Main Python package / source code
+│   ├── __init__.py
+│   ├── preprocessing.py     # Tokenization, lemmatization, etc.
+│   ├── classification.py    # Naive Bayes, Markov classifier
+│   ├── embeddings.py        # Word2Vec, GloVe, BERT embeddings
+│   ├── transformers.py      # Fine-tuned BERT, NER, sentiment
+│   ├── generation.py        # T5/BART for summarization/paraphrasing
+│   └── utils.py             # Helper functions (e.g., save/load models)
+│
+├── 📁 models/                # Saved model files
+│   ├── tfidf_vectorizer.pkl
+│   ├── naive_bayes_model.pkl
+│   └── bert_model/          # Transformer checkpoints if fine-tuned
+│
+├── 📁 app/                   # Streamlit or Flask app for UI
+│   ├── app.py               # Main entry point
+│   └── components/          # Reusable UI parts (optional)
+│
+├── 📁 visuals/               # Graphs, attention maps, charts
+│   ├── embeddings_tsne.png
+│   ├── attention_map.html
+│   └── classification_report.png
+│
+├── requirements.txt         # All dependencies
+├── README.md                # Project overview and instructions
+├── .gitignore               # Ignore data, checkpoints, etc.
+└── setup.py                 # If packaging as a pip module (optional)
