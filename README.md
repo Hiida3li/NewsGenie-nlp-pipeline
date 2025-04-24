@@ -1,1 +1,1 @@
-# hybrid-nlp-news-system
+# NewsGenie-nlp-pipeline
