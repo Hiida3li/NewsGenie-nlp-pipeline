@@ -1,4 +1,4 @@
-newsgenie-nlp-pipeline/
+NewsGenie-nlp-pipeline/
 │
 ├── 📁 data/                  # Raw and processed data
 │   ├── raw/                 # Uncleaned scraped or downloaded articles
