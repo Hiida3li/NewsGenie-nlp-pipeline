@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """
-News API Client - Fetch and process news articles
+Enhanced News API Client - Process and save news articles with full content support
 """
-import requests
-import os
-from dotenv import load_dotenv
 import json
 import csv
 from datetime import datetime
@@ -14,10 +11,10 @@ from pathlib import Path
 import sys
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+import requests
 from rich.console import Console
 from rich.table import Table
 from rich.logging import RichHandler
-import backoff
 
 
 @dataclass
@@ -49,64 +46,33 @@ class Article:
         )
 
 
-class NewsApiClient:
-    """Client for the News API"""
-    BASE_URL = "https://newsapi.org/v2"
-    
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize with API key from env or parameter"""
-        self.api_key = api_key or os.getenv("NEWS_API_KEY")
-        if not self.api_key:
-            raise ValueError("❌ NEWS_API_KEY not found in environment or .env file")
-        
-        self.logger = logging.getLogger(__name__)
-        self.console = Console()
-    
-    @backoff.on_exception(backoff.expo, 
-                          (requests.exceptions.RequestException, 
-                           requests.exceptions.HTTPError),
-                          max_tries=3)
-    def fetch_everything(self, 
-                         keyword: str = "Oman", 
-                         language: str = "ar", 
-                         page_size: int = 10) -> Dict[str, Any]:
-        """Fetch articles from 'everything' endpoint with retry capability"""
-        self.logger.info(f"Fetching news for keyword: '{keyword}' in {language}")
-        
-        url = f"{self.BASE_URL}/everything"
-        params = {
-            "q": keyword,
-            "language": language,
-            "sortBy": "publishedAt",
-            "pageSize": page_size,
-            "apiKey": self.api_key
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()  # Raises exception for 4XX/5XX responses
-        
-        data = response.json()
-        self.logger.info(f"Found {len(data.get('articles', []))} articles")
-        return data
-    
-    def get_articles(self, 
-                     keyword: str = "Oman", 
-                     language: str = "ar", 
-                     page_size: int = 10) -> List[Article]:
-        """Get articles as structured objects"""
-        data = self.fetch_everything(keyword, language, page_size)
-        return [Article.from_dict(article) for article in data.get("articles", [])]
-
-
-class NewsDataExporter:
-    """Handles exporting news data to different formats"""
+class NewsDataProcessor:
+    """Handles loading, processing and exporting news data"""
     
     def __init__(self, output_dir: Optional[str] = None):
-        """Initialize exporter with optional output directory"""
+        """Initialize processor with optional output directory"""
         self.output_dir = Path(output_dir) if output_dir else Path.cwd()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.logger = logging.getLogger(__name__)
+        self.console = Console()
+    
+    def load_json(self, data_str: str) -> Dict[str, Any]:
+        """Load data from JSON string"""
+        try:
+            return json.loads(data_str)
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse JSON: {e}")
+            raise
+    
+    def load_json_file(self, filepath: str) -> Dict[str, Any]:
+        """Load data from JSON file"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            self.logger.error(f"Failed to load JSON file: {e}")
+            raise
     
     def _get_filename(self, base_name: Optional[str], extension: str) -> Path:
         """Generate filename with timestamp if none provided"""
@@ -120,7 +86,7 @@ class NewsDataExporter:
         return self.output_dir / filename
     
     def save_json(self, data: Dict[str, Any], filename: Optional[str] = None) -> Path:
-        """Save raw API response to JSON file"""
+        """Save data to JSON file"""
         file_path = self._get_filename(filename, "json")
         self.logger.info(f"Saving JSON data to {file_path}")
         
@@ -140,7 +106,7 @@ class NewsDataExporter:
         
         with open(file_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
-            # Write header
+            # Write header with all fields
             writer.writerow(['title', 'source', 'source_id', 'author', 'description', 
                             'url', 'url_to_image', 'publishedAt', 'content'])
             
@@ -159,17 +125,35 @@ class NewsDataExporter:
                 ])
         
         return file_path
+    
+    def process_data(self, data: Dict[str, Any]) -> List[Article]:
+        """Process raw news API data into article objects"""
+        status = data.get("status")
+        total_results = data.get("totalResults", 0)
+        self.logger.info(f"API Status: {status}, Total Results: {total_results}")
+        
+        articles = [Article.from_dict(a) for a in data.get("articles", [])]
+        self.logger.info(f"Processed {len(articles)} articles")
+        return articles
+    
+    def process_and_save(self, data: Dict[str, Any], json_filename: Optional[str] = None, 
+                         csv_filename: Optional[str] = None) -> tuple:
+        """Process data and save to both JSON and CSV"""
+        articles = self.process_data(data)
+        json_path = self.save_json(data, json_filename)
+        csv_path = self.save_csv(articles, csv_filename)
+        return json_path, csv_path, articles
 
 
-def display_results(articles: List[Article]):
+def display_articles(articles: List[Article], show_full_content: bool = False):
     """Display article information in a rich formatted table"""
     console = Console()
-    table = Table(title="📰 Latest News Results")
+    table = Table(title="📰 News Articles Summary")
     
-    table.add_column("#", style="cyan")
+    table.add_column("#", style="cyan", no_wrap=True)
     table.add_column("Title", style="green", no_wrap=False)
-    table.add_column("Source", style="yellow")
-    table.add_column("Published", style="magenta")
+    table.add_column("Source", style="yellow", no_wrap=True)
+    table.add_column("Published", style="magenta", no_wrap=True)
     
     if not articles:
         console.print("[yellow]No articles found[/yellow]")
@@ -198,36 +182,41 @@ def display_results(articles: List[Article]):
         console.print(f"   [yellow]URL:[/yellow] [link={article.url}]{article.url}[/link]")
         if article.url_to_image:
             console.print(f"   [yellow]Image:[/yellow] [link={article.url_to_image}]{article.url_to_image}[/link]")
+        
+        # Content handling
         if article.content:
-            content_preview = article.content.split('[+')[0] if '[+' in article.content else article.content
-            console.print(f"   [yellow]Content Preview:[/yellow] {content_preview}")
+            if show_full_content:
+                console.print(f"   [yellow]Content:[/yellow] {article.content}")
+            else:
+                # Extract content before truncation marker if present
+                content_preview = article.content.split('[+')[0] if '[+' in article.content else article.content
+                console.print(f"   [yellow]Content Preview:[/yellow] {content_preview}")
+                if '[+' in article.content:
+                    console.print("   [dim](Full content available with --full-content flag)[/dim]")
+        console.print("   ---")
 
 
 def main():
     """Main entry point for the script"""
     # Set up argument parsing
     parser = argparse.ArgumentParser(
-        description="Fetch and save news articles",
+        description="Process and save news articles from JSON data",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--keyword", "-k", default="Oman", 
-                        help="Search keyword")
-    parser.add_argument("--language", "-l", default="ar", 
-                        help="Language code (e.g., ar, en)")
-    parser.add_argument("--count", "-c", type=int, default=10, 
-                        help="Number of articles to fetch")
+    parser.add_argument("input", nargs="?", 
+                        help="JSON input (file path or raw JSON string)")
     parser.add_argument("--output-dir", "-o", 
                         help="Directory to save output files")
     parser.add_argument("--json", "-j", 
-                        help="JSON output filename (optional)")
+                        help="JSON output filename")
     parser.add_argument("--csv", "-s", 
-                        help="CSV output filename (optional)")
+                        help="CSV output filename")
     parser.add_argument("--quiet", "-q", action="store_true", 
                         help="Suppress console display output")
-    parser.add_argument("--debug", "-d", action="store_true",
-                        help="Enable debug logging")
     parser.add_argument("--full-content", "-f", action="store_true",
                         help="Display full article content in console output")
+    parser.add_argument("--debug", "-d", action="store_true",
+                        help="Enable debug logging")
     
     args = parser.parse_args()
     
@@ -240,54 +229,42 @@ def main():
         handlers=[RichHandler(rich_tracebacks=True)]
     )
     
-    logger = logging.getLogger("news_client")
+    logger = logging.getLogger("news_processor")
     
     try:
-        # Load environment variables
-        load_dotenv()
+        processor = NewsDataProcessor(args.output_dir)
         
-        # Initialize client and fetch news
-        news_client = NewsApiClient()
-        raw_data = news_client.fetch_everything(
-            args.keyword, args.language, args.count
+        # Load data either from file or direct input
+        if args.input:
+            if Path(args.input).exists():
+                logger.info(f"Loading JSON from file: {args.input}")
+                data = processor.load_json_file(args.input)
+            else:
+                logger.info("Parsing JSON from input string")
+                data = processor.load_json(args.input)
+        else:
+            # Read from stdin
+            logger.info("Reading JSON from stdin")
+            import sys
+            data = processor.load_json(sys.stdin.read())
+        
+        # Process and save data
+        json_path, csv_path, articles = processor.process_and_save(
+            data, args.json, args.csv
         )
-        
-        # Process API response metadata
-        status = raw_data.get("status")
-        total_results = raw_data.get("totalResults", 0)
-        logger.info(f"API Status: {status}, Total Results: {total_results}")
-        
-        # Convert to Article objects
-        articles = [Article.from_dict(a) for a in raw_data.get("articles", [])]
-        
-        # Save data
-        exporter = NewsDataExporter(args.output_dir)
-        json_file = exporter.save_json(raw_data, args.json)
-        csv_file = exporter.save_csv(articles, args.csv)
         
         # Display results
         if not args.quiet:
-            display_results(articles)
-            if args.full_content:
-                console = Console()
-                console.print("\n[bold]Full Article Content:[/bold]")
-                for i, article in enumerate(articles, start=1):
-                    console.print(f"\n[cyan]{i}. {article.title}[/cyan]")
-                    if article.content:
-                        console.print(f"[yellow]Content:[/yellow] {article.content}")
-                    else:
-                        console.print("[yellow]No content available[/yellow]")
-                    console.print("---")
-            
+            display_articles(articles, args.full_content)
             logger.info(f"✅ Data saved to:")
-            logger.info(f"   JSON: {json_file}")
-            logger.info(f"   CSV: {csv_file}")
+            logger.info(f"   JSON: {json_path}")
+            logger.info(f"   CSV: {csv_path}")
             
-    except ValueError as e:
-        logger.error(f"{e}")
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON input")
         return 1
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Network error: {e}")
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
         return 1
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
@@ -298,3 +275,5 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+    
