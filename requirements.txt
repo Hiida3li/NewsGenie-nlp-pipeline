@@ -1,19 +1,26 @@
+# Core
 numpy==1.26.4
 pandas==2.2.0
 scikit-learn==1.5.2
 joblib==1.4.2
+# Preprocessing
 nltk==3.9.1
 spacy==3.7.6
 camel_tools==1.5.5
+# Classic ML
 gensim==4.3.3
+# Deep Learning and Transformers
 torch==2.4.1
 tensorflow==2.18.0
 transformers==4.43.4
+# Visualization
 matplotlib==3.8.0
 seaborn==0.12.2
 plotly==5.3.1
 scikit-image==0.24.0
+# App Development
 streamlit==1.40.2
+# Utilities
 tqdm==4.67.0
 python-dotenv==1.0.1
 requests==2.32.3
