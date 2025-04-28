@@ -3,9 +3,9 @@
 $ pip install -r requirements.txt
 '''
 
-# The complete NLP pipeline for **Arabic Gulf News Analysis** 
+# The complete NLP pipeline for Arabic Gulf News Analysis
 
-## 📚 Features
+## Features
 
 - **Preprocessing**: Tokenization, Lemmatization
 - **Classification**: Naive Bayes, Markov Models
@@ -13,9 +13,9 @@ $ pip install -r requirements.txt
 - **Transformers**: NER, Sentiment, Summarization
 - **UI**: Interactive app with Streamlit or Flask
 
-## 🛠️ Setup
+## Setup
 
 ```bash
-git clone https://github.com/yourusername/NewsGenie-nlp-pipeline.git
+git clone https://github.com/hiida3li/NewsGenie-nlp-pipeline.git
 cd NewsGenie-nlp-pipeline
 pip install -r requirements.txt
