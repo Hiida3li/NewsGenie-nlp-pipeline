@@ -1,8 +1,8 @@
 NewsGenie-nlp-pipeline/
 │
 ├── 📁 data/                  # Raw and processed data
-│   ├── raw/                 # Uncleaned scraped or downloaded articles
-│   ├── processed/           # Cleaned, tokenized, lemmatized versions
+│   ├── raw_data/                 # Uncleaned scraped or downloaded articles
+│   ├── processed_data/           # Cleaned, tokenized, lemmatized versions
 │   └── external/            # Any external datasets like AG News
 │
 ├── 📁 notebooks/             # Jupyter notebooks for exploration
