@@ -176,4 +176,5 @@ cython_debug/
 dataset/
 data/
 raw_data/
-
+# Ignore raw_data directory and its contents
+/data/raw_data/
